@@ -59,6 +59,13 @@ const s = {
     marginBottom: 10, transition: 'all 0.15s',
   },
   optionSelected: { border: '2px solid #4f46e5', background: '#eef2ff' },
+  optionCorrect:  { border: '2px solid #22c55e', background: '#f0fdf4', cursor: 'default' },
+  optionWrong:    { border: '2px solid #ef4444', background: '#fef2f2', cursor: 'default' },
+  optionMuted:    { border: '2px solid #f3f4f6', background: '#fafafa', opacity: 0.6, cursor: 'default' },
+  radioCorrect:   { border: '2px solid #22c55e', background: '#22c55e' },
+  radioWrong:     { border: '2px solid #ef4444', background: '#ef4444' },
+  letterCorrect:  { color: '#16a34a' },
+  letterWrong:    { color: '#ef4444' },
   radioBase: {
     width: 20, height: 20, borderRadius: '50%',
     border: '2px solid #d1d5db', background: '#fff',
@@ -125,6 +132,12 @@ const s = {
     fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer',
   },
   nextBtnDisabled: { background: '#e5e7eb', color: '#9ca3af', cursor: 'not-allowed' },
+  submitBtn: {
+    padding: '9px 20px', borderRadius: 8,
+    border: 'none', background: '#4f46e5',
+    fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer',
+  },
+  submitBtnDisabled: { background: '#e5e7eb', color: '#9ca3af', cursor: 'not-allowed' },
 
   // quiz progress
   progressCard: {
@@ -145,11 +158,14 @@ function formatTime(sec) {
 export default function QuizPage({ darkMode }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState(new Array(questions.length).fill(null))
+  const [submitted, setSubmitted] = useState(new Array(questions.length).fill(false))
   const [selected, setSelected] = useState(null)
   const [seconds, setSeconds] = useState(0)
   const [finished, setFinished] = useState(false)
+  const [showHint, setShowHint] = useState(false)
 
   const current = questions[currentIndex]
+  const isSubmitted = submitted[currentIndex]
 
   useEffect(() => {
     if (finished) return
@@ -159,25 +175,29 @@ export default function QuizPage({ darkMode }) {
 
   useEffect(() => {
     setSelected(answers[currentIndex])
+    setShowHint(false)
   }, [currentIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const saveAndGo = (nextFn) => {
-    const updated = [...answers]
-    updated[currentIndex] = selected
-    setAnswers(updated)
-    nextFn(updated)
+  const handleSubmit = () => {
+    if (selected === null || isSubmitted) return
+    const updatedAnswers = [...answers]
+    updatedAnswers[currentIndex] = selected
+    setAnswers(updatedAnswers)
+    const updatedSubmitted = [...submitted]
+    updatedSubmitted[currentIndex] = true
+    setSubmitted(updatedSubmitted)
   }
 
-  const handleNext = () => saveAndGo(updated => {
+  const handleNext = () => {
     if (currentIndex < questions.length - 1) setCurrentIndex(i => i + 1)
     else setFinished(true)
-  })
+  }
 
-  const handlePrev = () => saveAndGo(() => setCurrentIndex(i => i - 1))
+  const handlePrev = () => setCurrentIndex(i => i - 1)
 
-  const jumpTo = (idx) => saveAndGo(() => setCurrentIndex(idx))
+  const jumpTo = (idx) => setCurrentIndex(idx)
 
-  const answeredCount = answers.filter(a => a !== null).length
+  const answeredCount = submitted.filter(Boolean).length
   const score = answers.filter((a, i) => a === questions[i].correctIndex).length
   const pct = Math.round(((currentIndex + 1) / questions.length) * 100)
 
@@ -191,6 +211,7 @@ export default function QuizPage({ darkMode }) {
         onRestart={() => {
           setCurrentIndex(0)
           setAnswers(new Array(questions.length).fill(null))
+          setSubmitted(new Array(questions.length).fill(false))
           setSelected(null)
           setSeconds(0)
           setFinished(false)
@@ -238,34 +259,64 @@ export default function QuizPage({ darkMode }) {
 
             {current.options.map((opt, idx) => {
               const isSel = selected === idx
+              const isCorrect = idx === current.correctIndex
+              const isWrong = isSubmitted && isSel && !isCorrect
+
+              let optStyle = s.optionBase
+              let radioStyle = s.radioBase
+              let letterStyle = s.letterBase
+
+              if (isSubmitted) {
+                if (isCorrect)     { optStyle = { ...s.optionBase, ...s.optionCorrect }; radioStyle = { ...s.radioBase, ...s.radioCorrect }; letterStyle = { ...s.letterBase, ...s.letterCorrect } }
+                else if (isWrong)  { optStyle = { ...s.optionBase, ...s.optionWrong };   radioStyle = { ...s.radioBase, ...s.radioWrong };   letterStyle = { ...s.letterBase, ...s.letterWrong } }
+                else               { optStyle = { ...s.optionBase, ...s.optionMuted } }
+              } else if (isSel) {
+                optStyle = { ...s.optionBase, ...s.optionSelected }
+                radioStyle = { ...s.radioBase, ...s.radioSelected }
+                letterStyle = { ...s.letterBase, ...s.letterSelected }
+              }
+
               return (
                 <button
                   key={LABELS[idx]}
-                  style={{ ...s.optionBase, ...(isSel ? s.optionSelected : {}) }}
-                  onClick={() => setSelected(idx)}
-                  onMouseEnter={e => { if (!isSel) e.currentTarget.style.borderColor = '#c7d2fe' }}
-                  onMouseLeave={e => { if (!isSel) e.currentTarget.style.borderColor = '#e5e7eb' }}
+                  style={optStyle}
+                  onClick={() => { if (!isSubmitted) setSelected(idx) }}
+                  onMouseEnter={e => { if (!isSubmitted && !isSel) e.currentTarget.style.borderColor = '#c7d2fe' }}
+                  onMouseLeave={e => { if (!isSubmitted && !isSel) e.currentTarget.style.borderColor = '#e5e7eb' }}
                 >
-                  <span style={{ ...s.radioBase, ...(isSel ? s.radioSelected : {}) }}>
-                    {isSel && <span style={s.radioDot} />}
+                  <span style={radioStyle}>
+                    {(isSel && !isSubmitted) && <span style={s.radioDot} />}
+                    {isSubmitted && isCorrect && <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>✓</span>}
+                    {isSubmitted && isWrong   && <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>✗</span>}
                   </span>
-                  <span style={{ ...s.letterBase, ...(isSel ? s.letterSelected : {}) }}>
-                    {LABELS[idx]}.
-                  </span>
-                  <span style={{ ...s.optionText, ...(isSel ? s.optionTextSelected : {}) }}>
-                    {opt}
-                  </span>
+                  <span style={letterStyle}>{LABELS[idx]}.</span>
+                  <span style={{ ...s.optionText, ...(isSel && !isSubmitted ? s.optionTextSelected : {}) }}>{opt}</span>
                 </button>
               )
             })}
 
-            {/* Hint */}
-            <div style={s.hint}>
-              <div style={s.hintIcon}>
-                <Lightbulb size={15} color="#fff" />
+            {/* Hint toggle */}
+            <button
+              onClick={() => setShowHint(h => !h)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                marginTop: 16, padding: '7px 14px', borderRadius: 8,
+                border: '1px solid #c7d2fe', background: showHint ? '#eef2ff' : '#fff',
+                color: '#4f46e5', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              }}
+            >
+              <Lightbulb size={14} />
+              {showHint ? 'Hide Hint' : 'Show Hint'}
+            </button>
+
+            {showHint && (
+              <div style={s.hint}>
+                <div style={s.hintIcon}>
+                  <Lightbulb size={15} color="#fff" />
+                </div>
+                <p style={s.hintText}>{current.hint}</p>
               </div>
-              <p style={s.hintText}>{current.hint}</p>
-            </div>
+            )}
           </div>
 
           {/* Divider */}
@@ -275,22 +326,30 @@ export default function QuizPage({ darkMode }) {
           <div style={s.right}>
             <p style={s.overviewTitle}>Question Overview</p>
 
-            {questions.map((_, idx) => {
-              const isAnswered = answers[idx] !== null
+            {questions.map((q, idx) => {
+              const isSubmittedQ = submitted[idx]
+              const isCorrect = isSubmittedQ && answers[idx] === q.correctIndex
+              const isWrong = isSubmittedQ && answers[idx] !== q.correctIndex
               const isCurrent = idx === currentIndex
-              const circleStyle = isCurrent
-                ? s.circleCurrent
-                : isAnswered ? s.circleAnswered : s.circleUnanswered
+
+              let circleStyle = s.circleUnanswered
+              if (isCurrent)      circleStyle = s.circleCurrent
+              else if (isCorrect) circleStyle = s.circleAnswered
+              else if (isWrong)   circleStyle = { background: '#ef4444', color: '#fff' }
 
               return (
-                <div key={questions[idx].id} style={s.circleRow}>
+                <div key={q.id} style={s.circleRow}>
                   <button
                     style={{ ...s.circleBase, ...circleStyle }}
                     onClick={() => jumpTo(idx)}
                     onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)' }}
                     onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
                   >
-                    {isAnswered && !isCurrent ? '✓' : idx + 1}
+                    {(() => {
+                      if (isCorrect && !isCurrent) return '✓'
+                      if (isWrong && !isCurrent) return '✗'
+                      return String(idx + 1)
+                    })()}
                   </button>
                   {isCurrent && <span style={{ fontSize: 11, color: '#4f46e5', fontWeight: 500 }}>Current</span>}
                 </div>
@@ -301,7 +360,11 @@ export default function QuizPage({ darkMode }) {
             <div style={s.legend}>
               <div style={s.legendRow}>
                 <span style={{ ...s.dot, background: '#22c55e' }} />
-                <span style={s.legendLabel}>Answered</span>
+                <span style={s.legendLabel}>Correct</span>
+              </div>
+              <div style={s.legendRow}>
+                <span style={{ ...s.dot, background: '#ef4444' }} />
+                <span style={s.legendLabel}>Incorrect</span>
               </div>
               <div style={s.legendRow}>
                 <span style={{ ...s.dot, background: '#4f46e5' }} />
@@ -324,14 +387,26 @@ export default function QuizPage({ darkMode }) {
           >
             <ChevronLeft size={15} /> Previous
           </button>
-          <button
-            style={{ ...s.nextBtn, ...(selected === null ? s.nextBtnDisabled : {}) }}
-            onClick={handleNext}
-            disabled={selected === null}
-          >
-            {currentIndex === questions.length - 1 ? 'Finish Quiz' : 'Next'}
-            <ChevronRight size={15} />
-          </button>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            {!isSubmitted && (
+              <button
+                style={{ ...s.submitBtn, ...(selected === null ? s.submitBtnDisabled : {}) }}
+                onClick={handleSubmit}
+                disabled={selected === null}
+              >
+                Submit Answer
+              </button>
+            )}
+            <button
+              style={{ ...s.nextBtn, ...(isSubmitted ? {} : s.nextBtnDisabled) }}
+              onClick={handleNext}
+              disabled={!isSubmitted}
+            >
+              {currentIndex === questions.length - 1 ? 'Finish Quiz' : 'Next'}
+              <ChevronRight size={15} />
+            </button>
+          </div>
         </div>
       </div>
 
