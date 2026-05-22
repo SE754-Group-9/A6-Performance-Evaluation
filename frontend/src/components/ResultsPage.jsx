@@ -1,5 +1,4 @@
 import { Trophy, RefreshCw, Clock, CheckCircle2, XCircle } from 'lucide-react'
-import { questions } from '../data/questions'
 
 function formatTime(sec) {
   const m = Math.floor(sec / 60)
@@ -7,7 +6,7 @@ function formatTime(sec) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-export default function ResultsPage({ score, total, time, answers, onRestart }) {
+export default function ResultsPage({ score, total, time, questions, results, onRestart }) {
   const pct = Math.round((score / total) * 100)
 
   let grade = 'Needs more work'
@@ -60,14 +59,8 @@ export default function ResultsPage({ score, total, time, answers, onRestart }) 
           </div>
         </div>
 
-        {/* Progress bar */}
         <div style={{ height: 10, background: '#f3f4f6', borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', borderRadius: 999,
-            background: barColor,
-            width: `${pct}%`,
-            transition: 'width 0.6s',
-          }} />
+          <div style={{ height: '100%', borderRadius: 999, background: barColor, width: `${pct}%`, transition: 'width 0.6s' }} />
         </div>
       </div>
 
@@ -81,8 +74,8 @@ export default function ResultsPage({ score, total, time, answers, onRestart }) 
         <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 16 }}>Answer Review</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {questions.map((q, idx) => {
-            const userAnswer = answers[idx]
-            const correct = userAnswer === q.correctIndex
+            const r = results[q.id]
+            const correct = r?.correct
 
             return (
               <div key={q.id} style={{
@@ -99,29 +92,32 @@ export default function ResultsPage({ score, total, time, answers, onRestart }) 
                     Q{idx + 1}. {q.question}
                   </p>
                 </div>
-                {!correct && userAnswer !== null && (
+                {!correct && r && (
                   <p style={{ fontSize: 12, color: '#ef4444', marginBottom: 4, marginLeft: 28 }}>
-                    Your answer: {q.options[userAnswer]}
+                    Your answer: {q.options[r.selectedIndex ?? -1] ?? '—'}
                   </p>
                 )}
-                <p style={{ fontSize: 12, color: '#16a34a', marginLeft: 28 }}>
-                  Correct: {q.options[q.correctIndex]}
-                </p>
-                <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6, marginLeft: 28, fontStyle: 'italic' }}>
-                  {q.hint}
-                </p>
+                {r && (
+                  <p style={{ fontSize: 12, color: '#16a34a', marginLeft: 28 }}>
+                    Correct: {q.options[r.correctIndex]}
+                  </p>
+                )}
+                {r?.hint && (
+                  <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6, marginLeft: 28, fontStyle: 'italic' }}>
+                    {r.hint}
+                  </p>
+                )}
               </div>
             )
           })}
         </div>
       </div>
 
-      {/* Restart */}
       <button
         onClick={onRestart}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          padding: '14px', borderRadius: 12,
+          padding: 14, borderRadius: 12,
           background: '#4f46e5', color: '#fff',
           border: 'none', fontSize: 15, fontWeight: 600, cursor: 'pointer',
         }}

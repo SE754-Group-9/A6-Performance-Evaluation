@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Clock, LogOut, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react'
-import { questions } from '../data/questions'
 import ResultsPage from './ResultsPage'
 
 const LABELS = ['A', 'B', 'C', 'D']
@@ -156,36 +155,84 @@ function formatTime(sec) {
 }
 
 export default function QuizPage({ darkMode }) {
+  const [questions, setQuestions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [answers, setAnswers] = useState(new Array(questions.length).fill(null))
-  const [submitted, setSubmitted] = useState(new Array(questions.length).fill(false))
+  const [answers, setAnswers] = useState([])
+  const [submitted, setSubmitted] = useState([])
+  // results keyed by question id: { correct, correctIndex, hint }
+  const [results, setResults] = useState({})
   const [selected, setSelected] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
   const [seconds, setSeconds] = useState(0)
   const [finished, setFinished] = useState(false)
   const [showHint, setShowHint] = useState(false)
+  const [hints, setHints] = useState({})
+
+  // Fetch questions from API on mount
+  useEffect(() => {
+    fetch('/api/questions')
+      .then(r => r.json())
+      .then(data => {
+        setQuestions(data.questions)
+        setAnswers(new Array(data.questions.length).fill(null))
+        setSubmitted(new Array(data.questions.length).fill(false))
+        setLoading(false)
+      })
+      .catch(() => setFetchError(true))
+  }, [])
 
   const current = questions[currentIndex]
   const isSubmitted = submitted[currentIndex]
+  const currentResult = current ? results[current.id] : null
 
   useEffect(() => {
-    if (finished) return
-    const id = setInterval(() => setSeconds(sec => sec + 1), 1000)
-    return () => clearInterval(id)
+    if (!finished) {
+      const id = setInterval(() => setSeconds(sec => sec + 1), 1000)
+      return () => clearInterval(id)
+    }
   }, [finished])
 
   useEffect(() => {
-    setSelected(answers[currentIndex])
+    setSelected(answers[currentIndex] ?? null)
     setShowHint(false)
   }, [currentIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSubmit = () => {
-    if (selected === null || isSubmitted) return
-    const updatedAnswers = [...answers]
-    updatedAnswers[currentIndex] = selected
-    setAnswers(updatedAnswers)
-    const updatedSubmitted = [...submitted]
-    updatedSubmitted[currentIndex] = true
-    setSubmitted(updatedSubmitted)
+  const handleShowHint = async () => {
+    if (showHint) { setShowHint(false); return }
+    if (hints[current.id]) { setShowHint(true); return }
+    const hintText = currentResult?.hint
+    if (hintText) { setHints(prev => ({ ...prev, [current.id]: hintText })); setShowHint(true); return }
+    try {
+      const res = await fetch(`/api/questions/${current.id}/hint`)
+      const data = await res.json()
+      setHints(prev => ({ ...prev, [current.id]: data.hint }))
+      setShowHint(true)
+    } catch { /* silently ignore */ }
+  }
+
+  const handleSubmit = async () => {
+    if (selected === null || isSubmitted || submitting) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId: current.id, selectedIndex: selected }),
+      })
+      const data = await res.json()
+      const updatedAnswers = [...answers]
+      updatedAnswers[currentIndex] = selected
+      setAnswers(updatedAnswers)
+      const updatedSubmitted = [...submitted]
+      updatedSubmitted[currentIndex] = true
+      setSubmitted(updatedSubmitted)
+      setResults(prev => ({ ...prev, [current.id]: { ...data, selectedIndex: selected } }))
+      setShowHint(true)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleNext = () => {
@@ -194,12 +241,27 @@ export default function QuizPage({ darkMode }) {
   }
 
   const handlePrev = () => setCurrentIndex(i => i - 1)
-
   const jumpTo = (idx) => setCurrentIndex(idx)
 
   const answeredCount = submitted.filter(Boolean).length
-  const score = answers.filter((a, i) => a === questions[i].correctIndex).length
-  const pct = Math.round(((currentIndex + 1) / questions.length) * 100)
+  const score = Object.values(results).filter(r => r.correct).length
+  const pct = questions.length ? Math.round(((currentIndex + 1) / questions.length) * 100) : 0
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#6b7280', fontSize: 15 }}>
+        Loading questions...
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#ef4444', fontSize: 15 }}>
+        Failed to load questions. Is the backend running on port 3001?
+      </div>
+    )
+  }
 
   if (finished) {
     return (
@@ -207,11 +269,14 @@ export default function QuizPage({ darkMode }) {
         score={score}
         total={questions.length}
         time={seconds}
-        answers={answers}
+        questions={questions}
+        results={results}
         onRestart={() => {
           setCurrentIndex(0)
           setAnswers(new Array(questions.length).fill(null))
           setSubmitted(new Array(questions.length).fill(false))
+          setResults({})
+          setHints({})
           setSelected(null)
           setSeconds(0)
           setFinished(false)
@@ -259,8 +324,8 @@ export default function QuizPage({ darkMode }) {
 
             {current.options.map((opt, idx) => {
               const isSel = selected === idx
-              const isCorrect = idx === current.correctIndex
-              const isWrong = isSubmitted && isSel && !isCorrect
+              const isCorrect = isSubmitted && idx === currentResult?.correctIndex
+              const isWrong = isSubmitted && isSel && idx !== currentResult?.correctIndex
 
               let optStyle = s.optionBase
               let radioStyle = s.radioBase
@@ -297,7 +362,7 @@ export default function QuizPage({ darkMode }) {
 
             {/* Hint toggle */}
             <button
-              onClick={() => setShowHint(h => !h)}
+              onClick={handleShowHint}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 marginTop: 16, padding: '7px 14px', borderRadius: 8,
@@ -314,7 +379,7 @@ export default function QuizPage({ darkMode }) {
                 <div style={s.hintIcon}>
                   <Lightbulb size={15} color="#fff" />
                 </div>
-                <p style={s.hintText}>{current.hint}</p>
+                <p style={s.hintText}>{hints[current.id] ?? currentResult?.hint}</p>
               </div>
             )}
           </div>
@@ -327,9 +392,9 @@ export default function QuizPage({ darkMode }) {
             <p style={s.overviewTitle}>Question Overview</p>
 
             {questions.map((q, idx) => {
-              const isSubmittedQ = submitted[idx]
-              const isCorrect = isSubmittedQ && answers[idx] === q.correctIndex
-              const isWrong = isSubmittedQ && answers[idx] !== q.correctIndex
+              const qResult = results[q.id]
+              const isCorrect = qResult?.correct === true
+              const isWrong = qResult?.correct === false
               const isCurrent = idx === currentIndex
 
               let circleStyle = s.circleUnanswered
@@ -395,7 +460,7 @@ export default function QuizPage({ darkMode }) {
                 onClick={handleSubmit}
                 disabled={selected === null}
               >
-                Submit Answer
+                {submitting ? 'Submitting...' : 'Submit Answer'}
               </button>
             )}
             <button

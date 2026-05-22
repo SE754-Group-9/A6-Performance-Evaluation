@@ -153,7 +153,15 @@ app.post('/api/submit', (req, res) => {
   })
 })
 
-// GET quiz results summary
+// GET hint for a specific question
+app.get('/api/questions/:id/hint', (req, res) => {
+  const id = Number.parseInt(req.params.id)
+  const question = questions.find(q => q.id === id)
+  if (!question) return res.status(404).json({ error: 'Question not found' })
+  res.json({ hint: question.hint })
+})
+
+// GET health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
