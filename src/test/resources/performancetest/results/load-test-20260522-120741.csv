@@ -1,4 +1,0 @@
-timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
-1779408464108,14,GET /api/health,200,OK,Quiz API Load Users 1-1,text,true,,321,185,1,1,http://127.0.0.1:3001/api/health,12,0,8
-1779408464224,1,GET /api/questions,200,OK,Quiz API Load Users 1-1,text,true,,3353,188,1,1,http://127.0.0.1:3001/api/questions,1,0,0
-1779408464326,2,POST /api/submit,200,OK,Quiz API Load Users 1-1,text,true,,418,240,1,1,http://127.0.0.1:3001/api/submit,2,0,0

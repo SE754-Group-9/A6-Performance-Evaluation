@@ -35,7 +35,7 @@
           </elementProp>
           <elementProp name="responseTimeMs" elementType="Argument">
             <stringProp name="Argument.name">responseTimeMs</stringProp>
-            <stringProp name="Argument.value">${__P(responseTimeMs,1000)}</stringProp>
+            <stringProp name="Argument.value">${__P(responseTimeMs,300)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="thinkTimeMs" elementType="Argument">
