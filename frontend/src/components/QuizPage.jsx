@@ -173,14 +173,20 @@ export default function QuizPage({ darkMode }) {
   // Fetch questions from API on mount
   useEffect(() => {
     fetch('/api/questions')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('Failed to load questions')
+        return r.json()
+      })
       .then(data => {
         setQuestions(data.questions)
         setAnswers(new Array(data.questions.length).fill(null))
         setSubmitted(new Array(data.questions.length).fill(false))
         setLoading(false)
       })
-      .catch(() => setFetchError(true))
+      .catch(() => {
+        setFetchError(true)
+        setLoading(false)
+      })
   }, [])
 
   const current = questions[currentIndex]

@@ -1,8 +1,8 @@
 #!/bin/zsh
 set -euo pipefail
 
-ROOT="/Users/liuxiaoping/Documents/A6-Performance-Evaluation"
-TEST_DIR="$ROOT/src/test/resources/performancetest"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TEST_DIR="$SCRIPT_DIR"
 RESULTS_DIR="$TEST_DIR/results"
 PLAN="$TEST_DIR/quiz-api-load-test.jmx"
 
