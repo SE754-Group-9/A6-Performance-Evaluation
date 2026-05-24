@@ -1,7 +1,5 @@
 # CodeLearn - Multiple Choice Quiz
 
-CodeLearn implements a 10-question Object-Oriented Programming multiple-choice quiz for SOFTENG 754 Assignment 6. The frontend loads questions from the backend, submits selected answers, and displays immediate feedback, hints, score, accuracy, time taken, and answer review.
-
 ## Running the Application
 
 Start the backend:
